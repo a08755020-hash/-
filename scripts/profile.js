@@ -100,7 +100,13 @@ async function hmacSha256Hex(secret, message){
 const PROFILE_FILE_VERSION = 1;
 
 function safeProfileName(name){
-  return String(name||"").toLowerCase().replace(/[^a-z0-9_-]/g,"").slice(0,40);
+  /* Keep Unicode letters & digits so Cyrillic / Ukrainian nicknames
+     (the game's default audience) survive sanitisation. Mirrors the
+     Java `safeName()` in MainActivity.java which uses
+     Character.isLetterOrDigit() — if these two diverge the Android
+     disk file and the JS lookup key drift apart and "profile survives
+     reinstall" silently breaks. */
+  return String(name||"").toLowerCase().replace(/[^\p{L}\p{N}_-]/gu,"").slice(0,40);
 }
 
 async function buildProfileBlob(nickname, passwordHash){

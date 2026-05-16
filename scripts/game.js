@@ -512,7 +512,7 @@ function placePiece(idx, br, bc){
     const firstCell = cellEls[br][bc];
     if(firstCell){
       const r = firstCell.getBoundingClientRect();
-      fx.scorePop(placedCells, r.left + r.width/2, r.top - 4);
+      fx.scorePop(placedCells * SCORE_PER_CELL_PLACED, r.left + r.width/2, r.top - 4);
     }
   }
 

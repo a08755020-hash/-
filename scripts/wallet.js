@@ -122,9 +122,11 @@ function renderWallet(){
   }
   /* When the shop is the active screen, repaint the active grid so
      Buy buttons reflect the latest balance (enabled / disabled). The
-     paint functions don't call renderWallet, so there's no recursion. */
-  const shopScreen = document.querySelector('[data-screen="shop"]');
-  if(shopScreen && !shopScreen.hidden){
+     paint functions don't call renderWallet, so there's no recursion.
+     Screen visibility is driven by the `.active` class in CSS, not the
+     HTML `hidden` attribute, so we read `currentScreen` (set by go()
+     in ui.js) the same way activations.js does. */
+  if(typeof currentScreen !== "undefined" && currentScreen === "shop"){
     if(typeof shopTab !== "undefined" && shopTab === "coins" && typeof paintCoinGrid === "function") paintCoinGrid();
     else if(typeof paintSkinGrid === "function") paintSkinGrid();
   }
