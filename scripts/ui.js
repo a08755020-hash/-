@@ -360,6 +360,7 @@ function enterApp() {
   startGame();
   bindAppEvents();
   if (typeof initShopWiring === "function") initShopWiring();
+  if (typeof initBoosters === "function") initBoosters();
   if (typeof renderWallet === "function") renderWallet();
   refreshAllUI();
   // Stats avg uses totalScoreFromGames — backfill if missing

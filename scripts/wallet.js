@@ -38,7 +38,10 @@ function addCoins(n, opts){
   const amount = Math.max(0, Math.round(n));
   if(amount <= 0) return;
   state.wallet.coins = getCoins() + amount;
-  saveState();
+  /* Coalesced — both addCoins / spendCoins are routinely chained
+     with other state mutations (daily reward, redeem, booster
+     purchase, line-clear bonus) and used to write to disk twice. */
+  requestSaveState();
   renderWallet();
   if(opts && opts.silent) return;
   popCoinDelta(+amount);
@@ -50,7 +53,7 @@ function spendCoins(n){
   const amount = Math.round(n);
   if(getCoins() < amount) return false;
   state.wallet.coins -= amount;
-  saveState();
+  requestSaveState();
   renderWallet();
   popCoinDelta(-amount);
   try { sfx.coinSpend && sfx.coinSpend(); } catch {}
@@ -172,7 +175,12 @@ function popCoinDelta(delta){
 }
 
 /* Tick the countdown labels every 30 s so the menu pill stays fresh
-   even if the player sits on the screen. */
+   even if the player sits on the screen. We deliberately skip the
+   tick when the tab is hidden (no point repainting an invisible HUD)
+   and when the player is in-game, where renderWallet() also re-paints
+   the shop grid and was a measurable contributor to mid-drag jank. */
 setInterval(() => {
+  if(document.hidden) return;
+  if(typeof currentScreen !== "undefined" && currentScreen === "game") return;
   if(document.getElementById("daily-reward-pill")) renderWallet();
 }, 30_000);

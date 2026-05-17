@@ -239,6 +239,14 @@
     <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="12" rx="1.5"/><path d="M3 13h18"/><path d="M12 9v12"/><path d="M8 9c-2 0-3-3-1-4s4 4 4 4"/><path d="M16 9c2 0 3-3 1-4s-4 4-4 4"/></symbol>
     <symbol id="i-tg" viewBox="0 0 24 24"><path d="M3 11l17-7-3 16-5-3-3 4-1-5z"/><path d="M9 16l5-5"/></symbol>
     <symbol id="i-skin" viewBox="0 0 24 24"><path d="M4 7l4-4h8l4 4-3 3v9H7v-9z"/><path d="M9 10v9"/><path d="M15 10v9"/></symbol>
+    <!-- Booster icons (in-game booster bar + shop "Бусти" tab). Drawn
+         from scratch — no emoji — so they match the rest of the UI's
+         line-art style. -->
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/><path d="M16 21h5v-5"/><path d="M21 21l-5-5"/><path d="M3 3l5 5"/></symbol>
+    <symbol id="i-bomb" viewBox="0 0 24 24"><circle cx="11" cy="15" r="6"/><path d="M15 11l3-3"/><path d="M18 8l2-2"/><path d="M19 4l2 2"/></symbol>
+    <symbol id="i-light" viewBox="0 0 24 24"><path d="M9 2h6l-3 7h5l-9 13 3-9H6z"/></symbol>
+    <symbol id="i-hint" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10c1 1 2 2 2 4h4c0-2 1-3 2-4a6 6 0 0 0-4-10z"/></symbol>
+    <symbol id="i-skip" viewBox="0 0 24 24"><path d="M5 4l10 8-10 8z"/><path d="M19 5v14"/></symbol>
     <!-- Gradient used by inline HEX coin SVGs in shop cards. -->
     <linearGradient id="coin-grad" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffdf80"/>
@@ -520,6 +528,14 @@
 
       <div class="game-body">
         <div class="play-left">
+          <!-- In-game booster bar.
+               One slot per booster type. Each slot shows the icon, the
+               count of unspent charges, and lights up if the player
+               owns one. Tap → arms the booster; the next valid board
+               tap consumes a charge. Empty slots are click-throughs
+               that toast the player to "buy one in the shop". The bar
+               is rebuilt by scripts/boosts.js on every state change. -->
+          <div class="booster-bar" id="booster-bar" role="toolbar" aria-label="boosters"></div>
           <div class="board-wrap">
             <div class="board" id="board"></div>
           </div>
@@ -775,6 +791,10 @@
           <svg class="ic-svg"><use href="#i-coin"/></svg>
           <span data-i18n="shop.tab.coins">HEX coins</span>
         </button>
+        <button class="shop-tab" data-tab="boosts" role="tab">
+          <svg class="ic-svg"><use href="#i-bolt"/></svg>
+          <span data-i18n="shop.tab.boosts">Boosts</span>
+        </button>
         <button class="shop-tab" data-tab="redeem" role="tab">
           <svg class="ic-svg"><use href="#i-gift"/></svg>
           <span data-i18n="shop.tab.redeem">Activate code</span>
@@ -789,6 +809,10 @@
         <div class="shop-pane hidden" id="shop-pane-coins">
           <div class="shop-pane-hint" data-i18n="shop.coins.hint">HEX coins unlock skins. Pay via Telegram, the admin will top you up.</div>
           <div class="shop-grid coin-grid" id="shop-coin-grid"></div>
+        </div>
+        <div class="shop-pane hidden" id="shop-pane-boosts">
+          <div class="shop-pane-hint" data-i18n="shop.boosts.hint">One-shot power-ups you can fire from the booster bar above the board.</div>
+          <div class="shop-grid boost-grid" id="shop-boost-grid"></div>
         </div>
         <div class="shop-pane hidden" id="shop-pane-redeem">
           <div class="shop-pane-hint" data-i18n="shop.redeem.hint">Paste an activation code received from the admin to credit HEX to your wallet.</div>
@@ -968,6 +992,7 @@
 <script src="scripts/wallet.js"></script>
 <script src="scripts/shop.js"></script>
 <script src="scripts/game.js"></script>
+<script src="scripts/boosts.js"></script>
 <script src="scripts/hud.js"></script>
 <script src="scripts/tasks.js"></script>
 <script src="scripts/achievements.js"></script>

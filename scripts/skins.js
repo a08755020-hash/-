@@ -413,13 +413,83 @@ function skinIconSvg(id){
   return SKIN_ICON_BUILDERS.default(skin.palette);
 }
 
-/* The list order used by the shop grid. Default comes first so the
-   player always sees the "equipped" pill at the top, then the
-   hand-crafted themed skins, then every RGB-recipe skin in the order
-   they were declared. */
-const SHOP_SKIN_ORDER = [
-  "default","neon","aurora","ocean","pastel","sunset","ember","galaxy","mono",
-].concat(RGB_RECIPE_SKINS.map(r => r.id));
+/* ============================================================
+   Rarity tiers
+   ============================================================
+   The catalogue is large (80+ skins) — a flat grid of swatches makes
+   it hard for the player to tell "this is a cheap starter palette"
+   apart from "this is the rare gold/galaxy headline skin". A rarity
+   system gives every card a coloured badge + glow that scales with
+   price, plus a sort key so the shop grid climbs from common → mythic
+   as you scroll.
+
+   Tiers are derived from skin.price unless the skin itself sets an
+   explicit `rarity` field. The thresholds were picked so the existing
+   prices fall into roughly even buckets:
+
+     - starter  : the free default palette (price = 0)
+     - common   : 1 .. 1199 HEX
+     - rare     : 1200 .. 2199 HEX
+     - epic     : 2200 .. 4499 HEX
+     - legend   : 4500 .. 7999 HEX
+     - mythic   : 8000+ HEX
+
+   `accent` controls the badge background + card border glow. `label`
+   is the short Ukrainian word shown on the badge. */
+const RARITY_TIERS = [
+  { id: "starter", weight: 0, minPrice:    0, accent: "#6c7390", label: "Стартова"    },
+  { id: "common",  weight: 1, minPrice:    1, accent: "#9aa0b8", label: "Звичайна"    },
+  { id: "rare",    weight: 2, minPrice: 1200, accent: "#24bdff", label: "Рідкісна"    },
+  { id: "epic",    weight: 3, minPrice: 2200, accent: "#a766ff", label: "Епічна"      },
+  { id: "legend",  weight: 4, minPrice: 4500, accent: "#ffb454", label: "Легендарна"  },
+  { id: "mythic",  weight: 5, minPrice: 8000, accent: "#f25c8e", label: "Міфічна"     },
+];
+const RARITY_BY_ID = Object.fromEntries(RARITY_TIERS.map(t => [t.id, t]));
+
+/* Map a skin id to its rarity descriptor. The explicit `rarity` field
+   on a skin wins over price-based inference so curated hand-crafted
+   palettes can be promoted (e.g. neon is "common" by price but
+   shouldn't sit alongside the boring mono tints). */
+function skinRarity(id){
+  const skin = SKINS[id];
+  if(!skin) return RARITY_BY_ID.starter;
+  if(skin.rarity && RARITY_BY_ID[skin.rarity]) return RARITY_BY_ID[skin.rarity];
+  const price = skin.price | 0;
+  let tier = RARITY_BY_ID.starter;
+  for(const t of RARITY_TIERS){
+    if(price >= t.minPrice) tier = t;
+  }
+  return tier;
+}
+
+/* Explicit rarity bumps for hand-crafted themed skins. Default is
+   always the starter tier — every other entry steps up at least one
+   notch from where price alone would place it, because each themed
+   skin has bespoke art and feels more special than a price-equivalent
+   RGB recipe. */
+SKINS.default.rarity = "starter";
+SKINS.mono.rarity    = "common";
+SKINS.neon.rarity    = "rare";
+SKINS.aurora.rarity  = "rare";
+SKINS.ocean.rarity   = "epic";
+SKINS.pastel.rarity  = "epic";
+SKINS.sunset.rarity  = "legend";
+SKINS.ember.rarity   = "legend";
+SKINS.galaxy.rarity  = "mythic";
+
+/* The list order used by the shop grid. Default sits at the top as
+   the "equipped"/starter card, then the catalogue is sorted by rarity
+   weight (ascending — common first, mythic last) and inside each tier
+   by price. This makes the climb to "Міфічна" a visible progression
+   instead of a flat dump of palettes. */
+const _allSkinIds = ["neon","aurora","ocean","pastel","sunset","ember","galaxy","mono"]
+  .concat(RGB_RECIPE_SKINS.map(r => r.id));
+_allSkinIds.sort((a, b) => {
+  const ra = skinRarity(a), rb = skinRarity(b);
+  if(ra.weight !== rb.weight) return ra.weight - rb.weight;
+  return (SKINS[a].price | 0) - (SKINS[b].price | 0);
+});
+const SHOP_SKIN_ORDER = ["default"].concat(_allSkinIds);
 
 function currentSkinId(){
   return (state.skins && state.skins.equipped) || "default";

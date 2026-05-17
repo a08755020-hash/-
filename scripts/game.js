@@ -330,18 +330,42 @@ function rotatePiece(idx){
   sfx.click();
   vibrate(8);
   renderTray();
-  saveState();
+  /* Coalesced: rapid double/triple rotation no longer triggers a
+     separate disk write per click; only the last shape is persisted. */
+  requestSaveState();
 }
 
 /* ---------- Drag & drop (mouse + touch) ---------- */
 const dragLayer = ()=> $("#drag-layer");
 let dragData = null;
+/* During a drag we hit boardMetrics() once per rAF tick, which used
+   to mean a synchronous getBoundingClientRect() — i.e. a forced layout
+   on every pointer move. On a busy board this was a measurable chunk
+   of the per-frame budget on mid-range phones. We snapshot the rect
+   once at drag start (board geometry can't change mid-drag) and serve
+   it from this cache; the live function is still exported so callers
+   outside a drag (e.g. pieceCellPx() before dragData exists) keep
+   working the same way. */
+let _boardMetricsCache = null;
 function boardMetrics(){
+  if(_boardMetricsCache) return _boardMetricsCache;
   const rect = boardEl.getBoundingClientRect();
   const padding = 6, gap = 3;
   const cw = (rect.width - padding*2 - (BOARD_SIZE-1)*gap) / BOARD_SIZE;
   return { rect, padding, gap, cw };
 }
+function _primeBoardMetricsCache(){
+  _boardMetricsCache = null;
+  _boardMetricsCache = boardMetrics();
+}
+function _clearBoardMetricsCache(){
+  _boardMetricsCache = null;
+}
+/* If the viewport resizes (rotation, address-bar collapse, browser
+   resize) the cached rect is stale — drop it so the next read goes
+   back to getBoundingClientRect(). */
+window.addEventListener("resize", _clearBoardMetricsCache);
+window.addEventListener("orientationchange", _clearBoardMetricsCache);
 function pieceCellPx(){
   return boardMetrics().cw;
 }
@@ -362,6 +386,9 @@ function attachDrag(el, piece, idx){
   const onDown = (ev)=>{
     if(state.run.pieces[idx] !== piece) return;
     ev.preventDefault();
+    /* Prime the metrics cache so every subsequent pointermove during
+       this drag avoids a fresh getBoundingClientRect() / forced layout. */
+    _primeBoardMetricsCache();
     const point = ev.touches ? ev.touches[0] : ev;
     const sizePx = pieceCellPx();
     const float = makeFloatPiece(piece, sizePx);
@@ -466,6 +493,11 @@ function onUp(ev){
     placePiece(idx, lastValid.br, lastValid.bc);
   }
   dragData = null;
+  /* Drag's over — placePiece() ran renderBoard() which may have
+     changed the board's box size (line clears resize nothing today,
+     but a future tray collapse could). Drop the cache so the next
+     drag re-reads. */
+  _clearBoardMetricsCache();
 }
 
 /* ---------- Game flow ---------- */
@@ -476,6 +508,11 @@ function startGame(){
   renderTray();
   updateHUD();
   refreshSideTasks();
+  /* Booster slot counts persist across runs, so the bar's content
+     doesn't reset here — but a fresh DOM (after buildBoardDom) needs
+     to be repainted so the slots get re-attached on the game
+     screen. Safe no-op if boosts.js hasn't loaded yet. */
+  if(typeof renderBoosterBar === "function") renderBoosterBar();
 }
 function refillTrayIfEmpty(){
   if(state.run.pieces.every(p=>!p)){
@@ -652,7 +689,11 @@ function placePiece(idx, br, bc){
   renderTray();
   updateHUD();
   refreshSideTasks();
-  saveState();
+  /* Coalesce: this used to be a hard saveState() call that, combined
+     with bumpDailyTask / evaluateAchievements / unlockAch above, could
+     produce 4-7 sync disk writes in the same tick on a busy line
+     clear. Now they all fold into one microtask write. */
+  requestSaveState();
 
   // game over check
   if(!anyPieceFits()){
@@ -687,6 +728,9 @@ function endGame(){
   $("#modal-gameover").classList.add("show");
   sfx.gameover();
   vibrate([30,60,30]);
-  saveState();
+  /* End-of-run is a real terminal checkpoint — flush synchronously so
+     the high-score lands on disk before the player can close the tab
+     from the modal. */
+  flushSaveState();
 }
 

@@ -46,7 +46,10 @@ function unlockAch(id, titleKey, descKey, icon){
   state.achievements.add(id);
   toast(t("toast.unlocked") + ": " + t(titleKey, {n:0}), "success");
   beep(1200, 100, "triangle");
-  saveState();
+  /* Coalesce: a single placement that triggers triple-clear + cleaner
+     + a score milestone used to fire 3 full saveState() writes back
+     to back. The microtask scheduler folds them into one. */
+  requestSaveState();
   renderProfile(); renderAchievements();
 }
 function evaluateAchievements(){
@@ -71,7 +74,9 @@ function evaluateAchievements(){
       beep(1100, 90, "triangle");
     }
   });
-  saveState();
+  /* Same coalescing rationale as unlockAch above — and crucially this
+     loop runs once per placement, so the savings stack. */
+  requestSaveState();
 }
 let achFilter = "all", achQuery = "";
 function renderAchievements(){

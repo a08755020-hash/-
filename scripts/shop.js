@@ -1,10 +1,11 @@
 /* ============================================================
    HEXON BETA — Shop
    ============================================================
-   The shop has three tabs:
+   The shop has four tabs:
 
      1. "Скини" — gallery of piece palettes (skins.js). Each card
-        shows a 6-colour preview and either:
+        shows a 6-colour preview, a rarity badge (Стартова → Міфічна,
+        see skins.js → RARITY_TIERS) and either:
           - "Користуватися" if the player owns it but it's not equipped,
           - "Активна" (disabled) if the player has it equipped,
           - "Купити N HEX" (with affordability state) otherwise.
@@ -15,7 +16,12 @@
         Telegram (@PloxoyHard) with a pre-filled order message so the
         player can pay externally. No in-app payments are made.
 
-     3. "Активувати код" — paste a code received from the admin and
+     3. "Бусти" — five one-shot consumable power-ups (shuffle, bomb,
+        lightning, hint, skip). Buying increments state.boosts[id] by 1;
+        spending happens inside the game from the booster bar above the
+        board (scripts/boosts.js).
+
+     4. "Активувати код" — paste a code received from the admin and
         instantly credit HEX to the wallet. Shows a running counter of
         codes the player has redeemed on this device.
 
@@ -43,7 +49,7 @@ const COIN_BUNDLES = [
    per user instructions — change in one place if it ever moves. */
 const SHOP_TELEGRAM_HANDLE = "PloxoyHard";
 
-let shopTab = "skins";        // "skins" | "coins" | "redeem"
+let shopTab = "skins";        // "skins" | "coins" | "boosts" | "redeem"
 let pendingBundleId = null;   // bundle awaiting confirmation in #modal-shop-confirm
 
 function openShopScreen(){
@@ -56,6 +62,7 @@ function renderShop(){
   paintShopTabs();
   if(shopTab === "skins")       paintSkinGrid();
   else if(shopTab === "coins")  paintCoinGrid();
+  else if(shopTab === "boosts") paintBoostGrid();
   else if(shopTab === "redeem") paintRedeemPane();
   renderWallet();
 }
@@ -167,9 +174,11 @@ function paintShopTabs(){
   });
   const skinsPane  = document.getElementById("shop-pane-skins");
   const coinsPane  = document.getElementById("shop-pane-coins");
+  const boostsPane = document.getElementById("shop-pane-boosts");
   const redeemPane = document.getElementById("shop-pane-redeem");
   if(skinsPane)  skinsPane.classList.toggle("hidden",  shopTab !== "skins");
   if(coinsPane)  coinsPane.classList.toggle("hidden",  shopTab !== "coins");
+  if(boostsPane) boostsPane.classList.toggle("hidden", shopTab !== "boosts");
   if(redeemPane) redeemPane.classList.toggle("hidden", shopTab !== "redeem");
 }
 
@@ -184,9 +193,25 @@ function paintSkinGrid(){
     if(!skin) return;
     const owned = isSkinUnlocked(id);
     const isEquipped = (id === equipped);
+    /* Rarity descriptor drives the badge label + the card's glow
+       border. We poke the colour in via --rarity-color so the
+       stylesheet doesn't have to know about every tier. */
+    const rarity = (typeof skinRarity === "function") ? skinRarity(id) : null;
     const card = document.createElement("div");
     card.className = "shop-card skin-card" + (isEquipped ? " is-equipped" : owned ? " is-owned" : "");
+    if(rarity) card.classList.add("rarity-" + rarity.id);
     card.style.setProperty("--card-accent", skin.accent);
+    if(rarity) card.style.setProperty("--rarity-color", rarity.accent);
+
+    if(rarity){
+      /* Top-right badge — short label ("Рідкісна" / "Міфічна" …)
+         in the tier's accent colour. Localised via i18n.js. */
+      const badge = document.createElement("span");
+      badge.className = "skin-rarity-badge";
+      const key = "rarity." + rarity.id;
+      badge.textContent = (typeof t === "function" ? t(key) : null) || rarity.label;
+      card.appendChild(badge);
+    }
 
     /* Unique per-skin icon. The glyph itself is built in skins.js
        and inherits colours from the palette so no two skins look
@@ -248,6 +273,83 @@ function paintSkinGrid(){
 
     card.appendChild(swatch);
     card.appendChild(name);
+    card.appendChild(cta);
+    grid.appendChild(card);
+  });
+}
+
+/* ---------------- Boosts tab ----------------
+   Five one-shot consumable power-ups. The order here is also the
+   order in which they appear in the in-game booster bar (boosts.js).
+   Prices were picked so the cheapest (hint) is affordable after a
+   few runs and the most expensive (lightning) is a real splurge. */
+const BOOST_CATALOGUE = [
+  { id:"shuffle",   icon:"#i-shuffle", price:300, accent:"#24bdff" },
+  { id:"bomb",      icon:"#i-bomb",    price:600, accent:"#ff7a59" },
+  { id:"lightning", icon:"#i-light",   price:900, accent:"#ffe066" },
+  { id:"hint",      icon:"#i-hint",    price:200, accent:"#3ddc97" },
+  { id:"skip",      icon:"#i-skip",    price:500, accent:"#a766ff" },
+];
+
+function paintBoostGrid(){
+  const grid = document.getElementById("shop-boost-grid");
+  if(!grid) return;
+  grid.innerHTML = "";
+  const bag = (state && state.boosts) || {};
+  BOOST_CATALOGUE.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "shop-card boost-card boost-" + item.id;
+    card.style.setProperty("--card-accent", item.accent);
+
+    /* Big icon on a tinted disc — matches the visual rhythm of
+       skin-icon so the two grids feel like one family. */
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "boost-icon";
+    iconWrap.innerHTML = '<svg class="ic-svg lg"><use href="' + item.icon + '"/></svg>';
+
+    const name = document.createElement("div");
+    name.className = "boost-name";
+    name.textContent = (typeof t === "function" ? t("boost." + item.id + ".name") : null) || item.id;
+
+    const desc = document.createElement("div");
+    desc.className = "boost-desc";
+    desc.textContent = (typeof t === "function" ? t("boost." + item.id + ".desc") : null) || "";
+
+    const have = document.createElement("div");
+    have.className = "boost-have";
+    have.innerHTML = '<span class="boost-have-lbl">'
+      + ((typeof t === "function" ? t("shop.boost.have") : null) || "You own:")
+      + '</span> <b>' + (bag[item.id] | 0) + '</b>';
+
+    const can = getCoins() >= item.price;
+    const cta = document.createElement("button");
+    cta.className = "btn shop-cta " + (can ? "btn-primary" : "btn-disabled");
+    cta.disabled = !can;
+    cta.textContent = ((typeof t === "function" ? t("shop.boost.buy", { n: formatCoins(item.price) }) : null)
+                       || ("Buy " + formatCoins(item.price) + " HEX"));
+    cta.addEventListener("click", () => {
+      if(!spendCoins(item.price)){
+        toast(((typeof t === "function" ? t("shop.boost.poor") : null) || "Not enough HEX"), "warn");
+        return;
+      }
+      if(!state.boosts) state.boosts = { shuffle:0, bomb:0, lightning:0, hint:0, skip:0 };
+      state.boosts[item.id] = (state.boosts[item.id] | 0) + 1;
+      saveState();
+      try { sfx.shopEquip && sfx.shopEquip(); } catch {}
+      const nameStr = (typeof t === "function" ? t("boost." + item.id + ".name") : null) || item.id;
+      toast(((typeof t === "function" ? t("shop.boost.bought", { name: nameStr }) : null)
+             || ("+1 " + nameStr)), "success");
+      /* Refresh the in-game booster bar in case the player is
+         mid-run and the shop opened from somewhere else. The bar
+         tolerates being repainted from any screen. */
+      if(typeof renderBoosterBar === "function") renderBoosterBar();
+      renderShop();
+    });
+
+    card.appendChild(iconWrap);
+    card.appendChild(name);
+    card.appendChild(desc);
+    card.appendChild(have);
     card.appendChild(cta);
     grid.appendChild(card);
   });

@@ -22,6 +22,9 @@ function buildStateSnapshot(){
     leaderboards: state.leaderboards,
     wallet: state.wallet,
     skins:  state.skins,
+    /* Booster inventory — the counts behind the in-game booster bar.
+       Persisted alongside the wallet so purchases stick across runs. */
+    boosts: state.boosts || { shuffle:0, bomb:0, lightning:0, hint:0, skip:0 },
     usedActivationCodes: state.usedActivationCodes || [],
     activationUsage: state.activationUsage || {},
     activations: state.activations || { redeemed: 0, totalReceived: 0, generated: 0 },
@@ -41,6 +44,40 @@ function saveState(){
   try {
     if (typeof saveProfileToDisk === "function") saveProfileToDisk();
   } catch {}
+}
+
+/* Coalesced variant.
+   A single piece placement touches ~6 things that each "want" a save:
+   placePiece() itself, addXP() chained via task XP, every triggered
+   hidden achievement, every triggered evaluateAchievements unlock,
+   every bumpDailyTask invocation, and ensureDailyTasks() on day-roll.
+   Calling saveState() inline at each of those points is what made the
+   game stutter on mid-range Androids — every call does a full
+   JSON.stringify of the state + localStorage write + a JNI roundtrip
+   to the Java disk bridge. We coalesce all of them into a single
+   write at the end of the current microtask, so the visible cost
+   per move drops from O(unlocks) sync writes to exactly one.
+   `flushSaveState()` is provided for the rare "must be on disk now"
+   paths (game over, login, app pause). */
+let _saveStateScheduled = false;
+function requestSaveState(){
+  if(_saveStateScheduled) return;
+  _saveStateScheduled = true;
+  /* Microtask, not setTimeout — runs at the end of the current call
+     stack so the persisted blob already reflects every state mutation
+     in this turn. queueMicrotask is universally supported in modern
+     WebView, so no Promise.resolve() fallback needed. */
+  queueMicrotask(() => {
+    _saveStateScheduled = false;
+    saveState();
+  });
+}
+function flushSaveState(){
+  /* If a microtask is already pending, just run the save synchronously
+     and let the pending one no-op (the flag flip happens in the cb).
+     Either way the caller is guaranteed a write before we return. */
+  _saveStateScheduled = false;
+  saveState();
 }
 
 /* The player ID is supposed to be permanent — even a hard reset of all

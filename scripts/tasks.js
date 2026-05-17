@@ -24,7 +24,10 @@ function ensureDailyTasks(){
   const key = todayKey();
   if(state.dailyTasks.date !== key){
     state.dailyTasks = { date: key, tasks: generateDailyTasks() };
-    saveState();
+    /* Coalesce — ensureDailyTasks() is called at the top of every
+       bumpDailyTask, so on the first move of a new day we'd otherwise
+       fire two writes (one here, one from the achievement chain). */
+    requestSaveState();
   }
 }
 function bumpDailyTask(type, value, asMax){

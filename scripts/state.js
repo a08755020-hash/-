@@ -51,6 +51,13 @@ const state = {
      definitions live in scripts/skins.js. Every player starts with
      the default skin already unlocked. */
   skins:  { equipped: "default", unlocked: ["default"] },
+  /* One-time consumable power-ups purchased in the "Бусти" shop tab.
+     The values are counts of how many of each booster the player
+     currently owns. They're spent on the in-game booster bar above
+     the board (see scripts/game.js). Each booster is one-shot and the
+     count never goes below zero. Older saves missing this object are
+     migrated to an empty bag on load. */
+  boosts: { shuffle: 0, bomb: 0, lightning: 0, hint: 0, skip: 0 },
   // live, not persisted
   run: null,
 };

@@ -72,8 +72,14 @@ function tone(opts){
     freq = 440,
     dur  = 120,
     type = "sine",
-    attack  = 0.005,
-    release = 0.08,
+    /* Longer attack on most sfx turns the old click-y onset into a
+       gentle swell. Most presets override to a still-short value
+       so transient sounds (click, hover) stay crisp, but anything
+       voice-like (place, clear, combo, lvlup) inherits this slower
+       fade-in. */
+    attack  = 0.018,
+    /* Slower release adds tail / room reverb-like decay. */
+    release = 0.16,
     gain    = 0.08,
     detune  = 0,
     slide   = null,           // [startFreq, endFreq] for a pitch glide
@@ -93,69 +99,88 @@ function tone(opts){
   const peak = Math.max(0.0005, gain);
   g.gain.setValueAtTime(0.0001, now);
   g.gain.exponentialRampToValueAtTime(peak, now + attack);
-  g.gain.exponentialRampToValueAtTime(0.0002, now + dur/1000 + release);
+  /* Hold briefly at peak before the decay so a 55ms note still has
+     a perceptible "body" even with a long release tail. */
+  const hold = Math.max(0, dur/1000 - attack - 0.01);
+  g.gain.setValueAtTime(peak, now + attack + hold);
+  g.gain.exponentialRampToValueAtTime(0.0002, now + attack + hold + release);
   o.start(now);
-  o.stop(now + dur/1000 + release + 0.05);
+  o.stop(now + attack + hold + release + 0.05);
 }
 /* Backwards-compatible: simple sine tone. */
 function beep(freq, dur, type){
-  tone({ freq, dur, type: type || "sine", gain: 0.06 });
+  tone({ freq, dur, type: type || "sine", gain: 0.05 });
 }
 /* Curated effect presets (frequencies in Hz, dur in ms). Tuned to be
-   soft & pleasant — sines + triangles, low gains, short releases. */
+   soft & pleasant — sines + triangles, low gains, longer releases,
+   slight detune on doubled voices for a warm chorus-like thickness. */
 const sfx = {
-  click()   { tone({ freq: 660, dur: 45,  type: "sine",     gain: 0.04, release: 0.06 }); },
-  hover()   { tone({ freq: 880, dur: 28,  type: "sine",     gain: 0.018, release: 0.05 }); },
+  /* Quick UI transients keep a short attack so the response feels
+     instant — but with a gentler triangle wave instead of pure sine. */
+  click()   { tone({ freq: 620, dur: 30,  type: "triangle", gain: 0.030, attack: 0.004, release: 0.10 }); },
+  hover()   { tone({ freq: 880, dur: 22,  type: "sine",     gain: 0.014, attack: 0.004, release: 0.08 }); },
+  /* Two-voice pad with a perfect fifth above the root + slight detune
+     for a "wooden hex" tap. */
   place()   {
-    tone({ freq: 480, dur: 55, type: "sine",     gain: 0.045, release: 0.09 });
-    tone({ freq: 720, dur: 55, type: "triangle", gain: 0.025, detune: 4, release: 0.09 });
+    tone({ freq: 440, dur: 90, type: "triangle", gain: 0.040, attack: 0.012, release: 0.18, detune: -3 });
+    tone({ freq: 660, dur: 90, type: "sine",     gain: 0.022, attack: 0.012, release: 0.18, detune: +4 });
   },
+  /* Slightly muted minor-second wobble — clearly "wrong" but not harsh. */
   invalid() {
-    tone({ freq: 220, dur: 100, type: "triangle", gain: 0.035, slide: [220, 160] });
+    tone({ freq: 220, dur: 110, type: "triangle", gain: 0.030, attack: 0.010, release: 0.16, slide: [240, 170] });
   },
+  /* Two-octave shimmer with a soft fifth on top. */
   clear()   {
-    tone({ freq: 620, dur: 110, type: "sine",     gain: 0.055 });
-    tone({ freq: 930, dur: 140, type: "triangle", gain: 0.035, detune: 5 });
+    tone({ freq: 523, dur: 130, type: "sine",     gain: 0.045, attack: 0.012, release: 0.22 });
+    tone({ freq: 784, dur: 150, type: "triangle", gain: 0.028, detune: 5, attack: 0.012, release: 0.26 });
+    tone({ freq: 1046,dur: 170, type: "sine",     gain: 0.018, attack: 0.020, release: 0.30 });
   },
+  /* Major triad pad: root + third + fifth simultaneously. The base
+     frequency walks up with combo length to reward streaks. */
   combo(n)  {
-    const base = 500 + Math.min(8, n) * 50;
-    tone({ freq: base,        dur: 80,  type: "sine",     gain: 0.05 });
-    tone({ freq: base * 1.25, dur: 110, type: "sine",     gain: 0.035 });
-    tone({ freq: base * 1.5,  dur: 130, type: "triangle", gain: 0.025 });
+    const base = 440 + Math.min(8, n) * 40;
+    tone({ freq: base,        dur: 90,  type: "triangle", gain: 0.040, attack: 0.014, release: 0.22 });
+    tone({ freq: base * 1.25, dur: 120, type: "sine",     gain: 0.030, attack: 0.014, release: 0.24 });
+    tone({ freq: base * 1.5,  dur: 140, type: "triangle", gain: 0.022, attack: 0.014, release: 0.26 });
   },
   lvlup()   {
-    // Major triad arpeggio sweeping upward (softer triangles).
+    /* Major triad arpeggio over ~700ms with a sustained pad layered
+       beneath the last note for a "level up shimmer". */
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
-      setTimeout(()=> tone({ freq: f, dur: 150, type: "triangle", gain: 0.05, release: 0.12 }), i * 70);
+      setTimeout(()=> tone({ freq: f, dur: 180, type: "triangle", gain: 0.040, attack: 0.014, release: 0.22 }), i * 75);
     });
+    setTimeout(()=> tone({ freq: 523.25, dur: 400, type: "sine", gain: 0.022, attack: 0.040, release: 0.40 }), 230);
   },
+  /* Descending perfect-fourth fall — minor feel without the dissonance. */
   gameover(){
     [440, 392, 349.23, 293.66].forEach((f, i) => {
-      setTimeout(()=> tone({ freq: f, dur: 200, type: "sine", gain: 0.045 }), i * 100);
+      setTimeout(()=> tone({ freq: f, dur: 220, type: "sine", gain: 0.040, attack: 0.020, release: 0.30 }), i * 110);
     });
   },
-  toast()       { tone({ freq: 820, dur: 45, type: "sine", gain: 0.03 }); },
-  modalOpen()   { tone({ freq: 480, dur: 75, type: "sine", gain: 0.032, slide: [380, 540] }); },
-  modalClose()  { tone({ freq: 380, dur: 65, type: "sine", gain: 0.028, slide: [540, 380] }); },
+  toast()       { tone({ freq: 820, dur: 35, type: "sine", gain: 0.024, attack: 0.006, release: 0.10 }); },
+  modalOpen()   { tone({ freq: 480, dur: 90, type: "triangle", gain: 0.028, attack: 0.012, release: 0.18, slide: [380, 540] }); },
+  modalClose()  { tone({ freq: 380, dur: 80, type: "triangle", gain: 0.024, attack: 0.012, release: 0.18, slide: [540, 380] }); },
   /* Wallet & shop sounds — chime-style, deliberately gentle. */
   coinUp()    {
-    tone({ freq: 880, dur: 70, type: "sine",     gain: 0.045 });
-    setTimeout(()=> tone({ freq: 1318, dur: 90, type: "sine", gain: 0.03 }), 45);
+    tone({ freq: 880, dur: 80, type: "sine",     gain: 0.040, attack: 0.010, release: 0.20 });
+    setTimeout(()=> tone({ freq: 1318, dur: 100, type: "sine", gain: 0.025, attack: 0.012, release: 0.22 }), 45);
   },
   coinSpend() {
-    tone({ freq: 660, dur: 60, type: "sine",     gain: 0.035 });
-    setTimeout(()=> tone({ freq: 520, dur: 80, type: "sine", gain: 0.025 }), 40);
+    tone({ freq: 660, dur: 70, type: "triangle", gain: 0.030, attack: 0.010, release: 0.16 });
+    setTimeout(()=> tone({ freq: 520, dur: 90, type: "sine", gain: 0.022, attack: 0.012, release: 0.20 }), 40);
   },
   coinJackpot(){
-    // Daily-reward fanfare: ascending pentatonic over ~600ms.
+    /* Daily-reward fanfare: ascending pentatonic over ~600ms with a
+       low sustained drone for warmth. */
     [523, 659, 784, 988, 1175].forEach((f, i) => {
-      setTimeout(()=> tone({ freq: f, dur: 130, type: "triangle", gain: 0.04 }), i * 90);
+      setTimeout(()=> tone({ freq: f, dur: 150, type: "triangle", gain: 0.034, attack: 0.012, release: 0.22 }), i * 95);
     });
+    tone({ freq: 261.6, dur: 700, type: "sine", gain: 0.020, attack: 0.060, release: 0.40 });
   },
-  shopOpen()  { tone({ freq: 540, dur: 85, type: "sine", gain: 0.035, slide: [380, 620] }); },
+  shopOpen()  { tone({ freq: 540, dur: 90, type: "triangle", gain: 0.030, attack: 0.012, release: 0.20, slide: [380, 620] }); },
   shopEquip() {
-    tone({ freq: 740, dur: 90, type: "sine", gain: 0.04 });
-    setTimeout(()=> tone({ freq: 988, dur: 110, type: "triangle", gain: 0.03 }), 60);
+    tone({ freq: 740, dur: 100, type: "triangle", gain: 0.035, attack: 0.012, release: 0.20 });
+    setTimeout(()=> tone({ freq: 988, dur: 130, type: "sine", gain: 0.026, attack: 0.012, release: 0.24 }), 60);
   },
 };
 function vibrate(p){ if(state.settings.vibration && navigator.vibrate) navigator.vibrate(p); }
