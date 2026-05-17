@@ -17,9 +17,31 @@
 /* JSONBlob bin used as the shared scoreboard.
    Created with `POST https://jsonblob.com/api/jsonBlob` returning
    { version, updatedAt, entries: [] }.  The bin allows anonymous
-   GET / PUT so no API key is required from the client. */
-const LB_BLOB_ID    = "019e3032-3649-7bb6-8acb-de8e5696e8c2";
-const LB_BLOB_URL   = "https://jsonblob.com/api/jsonBlob/" + LB_BLOB_ID;
+   GET / PUT so no API key is required from the client.
+
+   The default bin ID below is the *current* shared bin. JSONBlob
+   garbage-collects bins that haven't been PUT to in 30 days, so the
+   previous one (019e3032-…) expired and started returning 404,
+   which made the leaderboard show only the local "me" row.
+   Self-healing logic in fetchLeaderboard() detects a 404 and asks
+   the server to mint a new bin, then stashes the fresh ID in
+   localStorage so this device keeps working even before a new
+   build is shipped. (Other devices won't see the same entries
+   until they install a build with the new default ID, but at
+   least their *own* device stays functional.) */
+const LB_BLOB_DEFAULT_ID = "019e3650-5402-78aa-b62f-cbdffb20a4e9";
+const LB_BLOB_LS_KEY     = "hex_lb_bin_id_v1";
+let   LB_BLOB_ID = (function(){
+  try {
+    const stored = (typeof localStorage !== "undefined") && localStorage.getItem(LB_BLOB_LS_KEY);
+    /* Stored IDs are honoured only if they look like a JSONBlob UUID. */
+    if (stored && /^[0-9a-f-]{16,}$/i.test(stored)) return stored;
+  } catch {}
+  return LB_BLOB_DEFAULT_ID;
+})();
+/* Public accessor so activations.js (which shares the bin) always
+   reads the live URL after a self-heal swap. */
+function getSharedBlobUrl(){ return "https://jsonblob.com/api/jsonBlob/" + LB_BLOB_ID; }
 const LB_REFRESH_MS = 60_000;   // poll cadence (the user asked for 1m)
 const LB_TIMEOUT_MS = 8_000;    // give up on a slow request
 const LB_MAX_ENTRIES = 100;     // cap to keep the bin small
@@ -33,11 +55,48 @@ async function _lbFetchJSON(url, init){
   const tm = setTimeout(() => ctrl.abort(), LB_TIMEOUT_MS);
   try {
     const res = await fetch(url, Object.assign({ signal: ctrl.signal, cache: "no-store" }, init || {}));
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    if (!res.ok){
+      /* Tag the error with the HTTP status so callers can distinguish
+         "bin disappeared" (404) from "server is dead" (5xx) and
+         attempt a self-heal in the former case. */
+      const err = new Error("HTTP " + res.status);
+      err.status = res.status;
+      throw err;
+    }
     return await res.json();
   } finally {
     clearTimeout(tm);
   }
+}
+
+/* Attempt to mint a new JSONBlob bin and remember it locally. We
+   bootstrap it with the empty leaderboard schema plus the activations
+   fields so the activations module also keeps working. Returns
+   true on success. Best-effort: any error means the device keeps
+   trying the previous ID on subsequent ticks. */
+async function _lbAdoptFreshBin(){
+  try {
+    const seed = { version: 1, updatedAt: Date.now(), entries: [], codeUsage: {}, grants: [] };
+    const res = await fetch("https://jsonblob.com/api/jsonBlob", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(seed),
+    });
+    if (!res.ok) return false;
+    /* JSONBlob returns the new bin ID in the `Location` header and
+       in the `X-jsonblob-id` header. We prefer the latter because
+       it doesn't require URL parsing. */
+    let newId = res.headers.get("x-jsonblob-id") || "";
+    if (!newId){
+      const loc = res.headers.get("location") || "";
+      const m = loc.match(/\/api\/jsonBlob\/([0-9a-f-]+)/i);
+      if (m) newId = m[1];
+    }
+    if (!newId || !/^[0-9a-f-]{16,}$/i.test(newId)) return false;
+    LB_BLOB_ID = newId;
+    try { localStorage.setItem(LB_BLOB_LS_KEY, newId); } catch {}
+    return true;
+  } catch { return false; }
 }
 
 /* Parse the bin and normalise into [{name,id,score,at}]. We accept
@@ -86,7 +145,7 @@ function _lbMergeMe(remote){
 async function fetchLeaderboard(){
   lbCache.lastFetchAt = Date.now();
   try {
-    const data = await _lbFetchJSON(LB_BLOB_URL, { method: "GET", headers: { "Accept": "application/json" } });
+    const data = await _lbFetchJSON(getSharedBlobUrl(), { method: "GET", headers: { "Accept": "application/json" } });
     const parsed = _lbParseRemote(data);
     parsed.sort((a, b) => (b.score | 0) - (a.score | 0));
     lbCache.entries  = parsed.slice(0, LB_MAX_ENTRIES);
@@ -94,8 +153,25 @@ async function fetchLeaderboard(){
     lbCache.online   = true;
     lbCache.error    = null;
   } catch (e) {
-    lbCache.online = false;
-    lbCache.error  = String((e && e.message) || e);
+    /* If the bin vanished server-side (404), try to create a fresh
+       one and adopt it. The next poll tick will populate it with
+       whatever scores we have locally. */
+    if (e && e.status === 404){
+      const ok = await _lbAdoptFreshBin();
+      if (ok){
+        lbCache.online = true;
+        lbCache.error  = null;
+        /* Seed it with our own best so the table isn't empty for
+           this device on the very next render. */
+        if (typeof submitLeaderboardScore === "function") submitLeaderboardScore();
+      } else {
+        lbCache.online = false;
+        lbCache.error  = "HTTP 404";
+      }
+    } else {
+      lbCache.online = false;
+      lbCache.error  = String((e && e.message) || e);
+    }
   }
   /* Keep state.leaderboards in sync so other modules (e.g. the
      menu badge) read the latest list. */
@@ -117,7 +193,7 @@ async function submitLeaderboardScore(){
   const myBest = (state.stats && state.stats.best) || 0;
   if (!myId || !myName || myBest <= 0) return;
   try {
-    const data    = await _lbFetchJSON(LB_BLOB_URL, { method: "GET" });
+    const data    = await _lbFetchJSON(getSharedBlobUrl(), { method: "GET" });
     const entries = _lbParseRemote(data);
     const idx     = entries.findIndex(e => e.id === myId);
     const mine    = { name: myName.slice(0, 24), id: myId, score: myBest, at: Date.now() };
@@ -132,7 +208,7 @@ async function submitLeaderboardScore(){
       updatedAt: Date.now(),
       entries:   entries.slice(0, LB_MAX_ENTRIES),
     });
-    await _lbFetchJSON(LB_BLOB_URL, {
+    await _lbFetchJSON(getSharedBlobUrl(), {
       method:  "PUT",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(body),

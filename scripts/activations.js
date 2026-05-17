@@ -45,9 +45,11 @@
    ============================================================ */
 "use strict";
 
-/* The JSONBlob URL is defined in leaderboard.js (LB_BLOB_URL).
-   We import it implicitly because all scripts are loaded into the
-   same global scope. */
+/* The shared JSONBlob URL is defined in leaderboard.js — we read
+   it via getSharedBlobUrl() so that a 404-driven bin swap in
+   leaderboard.js propagates here on the very next call. All scripts
+   are loaded into the same global scope so the function is just
+   available. */
 
 /* Network knobs. The poll cadence is intentionally generous — grants
    are not time-critical and we want to keep bandwidth low. */
@@ -85,14 +87,14 @@ async function _actFetch(url, init){
 /* Read the shared bin. Returns the raw object so callers can edit
    and PUT it back, preserving unknown fields. */
 async function fetchActivationBin(){
-  return await _actFetch(LB_BLOB_URL, { method: "GET", headers: { "Accept": "application/json" } });
+  return await _actFetch(getSharedBlobUrl(), { method: "GET", headers: { "Accept": "application/json" } });
 }
 
 /* Write the shared bin. Preserves everything the caller passed in
    and bumps updatedAt. */
 async function putActivationBin(body){
   const out = Object.assign({}, body || {}, { version: 1, updatedAt: Date.now() });
-  await _actFetch(LB_BLOB_URL, {
+  await _actFetch(getSharedBlobUrl(), {
     method:  "PUT",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify(out),
