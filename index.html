@@ -16,6 +16,8 @@
 <link rel="stylesheet" href="styles/components.css">
 <link rel="stylesheet" href="styles/game.css">
 <link rel="stylesheet" href="styles/shop.css">
+<link rel="stylesheet" href="styles/tournaments.css">
+<link rel="stylesheet" href="styles/whatsnew.css">
 <link rel="stylesheet" href="styles/effects.css">
 
 <!-- Boot splash — inlined so it paints on the very first frame
@@ -247,6 +249,9 @@
     <symbol id="i-light" viewBox="0 0 24 24"><path d="M9 2h6l-3 7h5l-9 13 3-9H6z"/></symbol>
     <symbol id="i-hint" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10c1 1 2 2 2 4h4c0-2 1-3 2-4a6 6 0 0 0-4-10z"/></symbol>
     <symbol id="i-skip" viewBox="0 0 24 24"><path d="M5 4l10 8-10 8z"/><path d="M19 5v14"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 3v4M16 3v4"/><circle cx="8" cy="14" r="0.9" fill="currentColor"/><circle cx="12" cy="14" r="0.9" fill="currentColor"/><circle cx="16" cy="14" r="0.9" fill="currentColor"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></symbol>
+    <symbol id="i-news" viewBox="0 0 24 24"><path d="M12 3l1.7 4.3 4.3 1.7-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7z"/><path d="M19 14v3M20.5 15.5h-3M6 17v2M7 18H5"/></symbol>
     <!-- Gradient used by inline HEX coin SVGs in shop cards. -->
     <linearGradient id="coin-grad" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffdf80"/>
@@ -452,6 +457,18 @@
       </header>
 
       <div class="menu-body">
+        <!-- "What's new" pill above the Play card. Pulses a tiny dot
+             when the player hasn't opened the changelog for the
+             current build yet. Click opens #modal-whatsnew. -->
+        <button class="whatsnew-pill glass" id="whatsnew-btn" type="button" aria-label="What's new">
+          <span class="whatsnew-pill-icon"><svg class="ic-svg"><use href="#i-sparkle"/></svg></span>
+          <span class="whatsnew-pill-text">
+            <b data-i18n="whatsnew.cta">What's new</b>
+            <span class="whatsnew-pill-sub" data-i18n="whatsnew.cta.sub">See the latest fixes and features</span>
+          </span>
+          <span class="whatsnew-pill-dot hidden" id="whatsnew-dot" aria-hidden="true"></span>
+        </button>
+
         <button class="play-card" data-go="game">
           <div class="play-card-icon">
             <svg class="ic-svg xl"><use href="#i-play"/></svg>
@@ -494,6 +511,10 @@
           <button class="menu-tile glass menu-tile-shop" id="menu-shop">
             <svg class="ic-svg lg"><use href="#i-shop"/></svg>
             <span data-i18n="tab.shop">Shop</span>
+          </button>
+          <button class="menu-tile glass menu-tile-tour" data-go="tournaments">
+            <svg class="ic-svg lg"><use href="#i-trophy"/></svg>
+            <span data-i18n="tab.tournaments">Tournaments</span>
           </button>
           <button class="menu-tile glass menu-tile-admin hidden" id="menu-admin" data-go="admin">
             <svg class="ic-svg lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-4z"/><path d="M9 12l2 2 4-4"/></svg>
@@ -841,6 +862,72 @@
       </div>
     </section>
 
+    <!-- ============ TOURNAMENTS SCREEN ============
+         Admin-curated tournament list. Players see a read-only feed
+         with status badges (upcoming / live / ended); admin sees an
+         extra creation form with name, description, start, end, and
+         optional prize. State lives in the shared JSONBlob bin so
+         the list polls together with the leaderboard. -->
+    <section class="screen tour-screen" data-screen="tournaments">
+      <header class="screen-head">
+        <button class="btn-back" data-go="menu">
+          <svg class="ic-svg lg"><use href="#i-arrow-left"/></svg>
+          <span data-i18n="nav.menu">Menu</span>
+        </button>
+        <h2 class="screen-title">
+          <svg class="ic-svg lg"><use href="#i-trophy"/></svg>
+          <span data-i18n="tab.tournaments">Tournaments</span>
+        </h2>
+        <span class="head-spacer"></span>
+      </header>
+      <div class="scroll-body tour-body">
+        <!-- Admin-only creation form. Toggled visible via #tour-admin-form.hidden
+             in scripts/tournaments.js. -->
+        <div class="tour-admin-form hidden" id="tour-admin-form">
+          <div class="tour-admin-head">
+            <svg class="ic-svg lg" style="color:var(--accent)"><use href="#i-calendar"/></svg>
+            <b data-i18n="tour.admin.title">Schedule tournament</b>
+          </div>
+          <p class="tour-admin-hint" data-i18n="tour.admin.hint">Players see a read-only list with countdowns. Prize is informational — top up the winner via &quot;Send HEX by ID&quot;.</p>
+          <div class="tour-admin-grid">
+            <label class="tour-field">
+              <span data-i18n="tour.field.name">Tournament name</span>
+              <input type="text" id="tour-name" maxlength="80" placeholder="Friday rush" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="tour-field tour-field-wide">
+              <span data-i18n="tour.field.desc">Description</span>
+              <textarea id="tour-desc" maxlength="500" rows="3" placeholder="Highest score wins · top 3 share the pot"></textarea>
+            </label>
+            <label class="tour-field">
+              <span data-i18n="tour.field.start">Start (date &amp; time)</span>
+              <input type="datetime-local" id="tour-start">
+            </label>
+            <label class="tour-field">
+              <span data-i18n="tour.field.end">End (date &amp; time)</span>
+              <input type="datetime-local" id="tour-end">
+            </label>
+            <label class="tour-field">
+              <span data-i18n="tour.field.prize">Prize (HEX, optional)</span>
+              <input type="number" id="tour-prize" min="0" step="1" placeholder="50000" autocomplete="off">
+            </label>
+          </div>
+          <div class="tour-admin-actions">
+            <button class="btn btn-primary" id="tour-create-btn">
+              <svg class="ic-svg"><use href="#i-calendar"/></svg>
+              <span data-i18n="tour.admin.create">Create tournament</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <span class="dot"></span>
+          <span data-i18n="tour.list.title">Tournaments</span>
+          <span style="margin-left:auto;font-size:12px;color:var(--fg-mute)" data-i18n="tour.list.note">Live · syncs every two minutes</span>
+        </div>
+        <div class="tour-list" id="tour-list"></div>
+      </div>
+    </section>
+
     <!-- ============ ADMIN SCREEN ============ -->
     <section class="screen admin-screen" data-screen="admin">
       <header class="screen-head">
@@ -958,6 +1045,25 @@
     </div>
   </div>
 
+  <!-- Modal: What's new (changelog).
+       Body is populated by scripts/changelog.js. Each version section
+       fades in with a small stagger so the modal feels animated. -->
+  <div class="modal-back" id="modal-whatsnew">
+    <div class="modal glass whatsnew-modal" role="dialog" aria-modal="true" aria-labelledby="whatsnew-title">
+      <div class="whatsnew-head-row">
+        <div class="whatsnew-title-wrap">
+          <span class="whatsnew-title-icon"><svg class="ic-svg lg"><use href="#i-sparkle"/></svg></span>
+          <h2 id="whatsnew-title" data-i18n="whatsnew.title">What's new</h2>
+        </div>
+        <button class="btn btn-ghost icon-btn" id="whatsnew-close" aria-label="close">
+          <svg class="ic-svg"><use href="#i-x"/></svg>
+        </button>
+      </div>
+      <p class="whatsnew-sub" data-i18n="whatsnew.sub">Latest fixes, polish, and new features.</p>
+      <div class="whatsnew-body" id="whatsnew-body"></div>
+    </div>
+  </div>
+
   <!-- Modal: How to play -->
   <div class="modal-back" id="modal-howto">
     <div class="modal glass" style="text-align:left">
@@ -998,6 +1104,8 @@
 <script src="scripts/achievements.js"></script>
 <script src="scripts/leaderboard.js"></script>
 <script src="scripts/activations.js"></script>
+<script src="scripts/tournaments.js"></script>
+<script src="scripts/changelog.js"></script>
 <script src="scripts/dropdown.js"></script>
 <script src="scripts/ui.js"></script>
 <script src="scripts/main.js"></script>

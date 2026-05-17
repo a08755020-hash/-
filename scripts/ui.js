@@ -378,6 +378,13 @@ function enterApp() {
      leaderboards, and pauses when the tab is hidden. See
      scripts/activations.js. */
   if (typeof startGrantPolling === "function") startGrantPolling();
+  /* Tournaments share the leaderboard bin, so we poll them on a
+     slower cadence (2 min) — they barely change. See
+     scripts/tournaments.js. */
+  if (typeof startTournamentPolling === "function") startTournamentPolling();
+  /* Wire the menu's "What's new" pill. It opens the changelog modal
+     and flashes a dot when this build has unseen entries. */
+  if (typeof wireWhatsnewControls === "function") wireWhatsnewControls();
   /* Submit our cached best score to the shared bin in case the
      last run never made it (e.g. the player closed the app while
      offline). Fire-and-forget. */
@@ -454,6 +461,7 @@ function go(screen) {
   if (screen === "achievements") renderAchievements();
   if (screen === "shop" && typeof renderShop === "function") renderShop();
   if (screen === "admin" && typeof renderAdminScreen === "function") renderAdminScreen();
+  if (screen === "tournaments" && typeof renderTournaments === "function") renderTournaments();
   if (typeof renderWallet === "function") renderWallet();
   if (screen === "game") updateHUD();
 }
