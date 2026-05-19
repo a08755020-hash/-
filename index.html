@@ -456,73 +456,110 @@
         </div>
       </header>
 
-      <div class="menu-body">
-        <!-- "What's new" pill above the Play card. Pulses a tiny dot
-             when the player hasn't opened the changelog for the
-             current build yet. Click opens #modal-whatsnew. -->
-        <button class="whatsnew-pill glass" id="whatsnew-btn" type="button" aria-label="What's new">
-          <span class="whatsnew-pill-icon"><svg class="ic-svg"><use href="#i-sparkle"/></svg></span>
-          <span class="whatsnew-pill-text">
-            <b data-i18n="whatsnew.cta">What's new</b>
-            <span class="whatsnew-pill-sub" data-i18n="whatsnew.cta.sub">See the latest fixes and features</span>
-          </span>
-          <span class="whatsnew-pill-dot hidden" id="whatsnew-dot" aria-hidden="true"></span>
-        </button>
+      <!-- Bento-grid menu body. Hero "Play" tile is 2x2 and dominates
+           the visual hierarchy; "What's new" is a wide 2x1 accent
+           tile that pulses a dot when a new changelog is available;
+           "Tournaments" and "Shop" are accent 1x1 tiles flanking the
+           hero on the right; secondary tiles flow into the remaining
+           grid cells. Layout collapses to two columns on narrow
+           screens. Entrance is staggered via --bento-i.
+           Ambient blobs drift behind the grid for depth. -->
+      <div class="menu-body bento-body">
+        <div class="menu-ambient" aria-hidden="true">
+          <span class="amb amb-1"></span>
+          <span class="amb amb-2"></span>
+          <span class="amb amb-3"></span>
+        </div>
 
-        <button class="play-card" data-go="game">
-          <div class="play-card-icon">
-            <svg class="ic-svg xl"><use href="#i-play"/></svg>
-          </div>
-          <div class="play-card-text">
-            <div class="big" data-i18n="menu.play">Play</div>
-            <div class="sub" data-i18n="menu.play.sub">Drop pieces onto the 10×10 board</div>
-          </div>
-          <div class="play-card-stats">
-            <div><span class="lbl" data-i18n="hud.best">Best</span> <b class="mono" id="menu-card-best">0</b></div>
-            <div><span class="lbl" data-i18n="hud.lvl">Lvl</span> <b class="mono" id="menu-card-level">1</b></div>
-          </div>
-        </button>
+        <div class="bento-grid">
+          <!-- HERO: Play (2x2) -->
+          <button class="bento-tile bento-play" data-go="game" style="--bento-i:0">
+            <span class="bento-sheen"></span>
+            <span class="bento-glow"></span>
+            <div class="bento-play-head">
+              <div class="bento-play-icon">
+                <svg class="ic-svg xl"><use href="#i-play"/></svg>
+              </div>
+              <div class="bento-play-text">
+                <div class="big" data-i18n="menu.play">Play</div>
+                <div class="sub" data-i18n="menu.play.sub">Drop pieces onto the 10×10 board</div>
+              </div>
+            </div>
+            <div class="bento-play-stats">
+              <div><span class="lbl" data-i18n="hud.best">Best</span> <b class="mono" id="menu-card-best">0</b></div>
+              <div><span class="lbl" data-i18n="hud.lvl">Lvl</span> <b class="mono" id="menu-card-level">1</b></div>
+            </div>
+          </button>
 
-        <div class="menu-grid">
-          <button class="menu-tile glass" data-go="tasks">
-            <svg class="ic-svg lg"><use href="#i-tasks"/></svg>
-            <span data-i18n="tab.tasks">Tasks</span>
+          <!-- ACCENT (wide): What's new -->
+          <button class="bento-tile bento-news" id="whatsnew-btn" type="button" aria-label="What's new" style="--bento-i:1">
+            <span class="bento-sheen"></span>
+            <span class="bento-news-icon"><svg class="ic-svg"><use href="#i-sparkle"/></svg></span>
+            <div class="bento-news-text">
+              <b data-i18n="whatsnew.cta">What's new</b>
+              <span class="bento-news-sub" data-i18n="whatsnew.cta.sub">See the latest fixes and features</span>
+            </div>
+            <span class="bento-news-dot hidden" id="whatsnew-dot" aria-hidden="true"></span>
           </button>
-          <button class="menu-tile glass" data-go="stats">
-            <svg class="ic-svg lg"><use href="#i-stats"/></svg>
-            <span data-i18n="tab.stats">Stats</span>
+
+          <!-- ACCENT: Tournaments -->
+          <button class="bento-tile bento-tour" data-go="tournaments" style="--bento-i:2">
+            <span class="bento-sheen"></span>
+            <svg class="ic-svg lg bento-tile-icon"><use href="#i-trophy"/></svg>
+            <span class="bento-tile-label" data-i18n="tab.tournaments">Tournaments</span>
           </button>
-          <button class="menu-tile glass" data-go="profile">
-            <svg class="ic-svg lg"><use href="#i-profile"/></svg>
-            <span data-i18n="tab.profile">Profile</span>
+
+          <!-- ACCENT: Shop -->
+          <button class="bento-tile bento-shop" id="menu-shop" style="--bento-i:3">
+            <span class="bento-sheen"></span>
+            <svg class="ic-svg lg bento-tile-icon"><use href="#i-shop"/></svg>
+            <span class="bento-tile-label" data-i18n="tab.shop">Shop</span>
           </button>
-          <button class="menu-tile glass" data-go="leaderboards">
-            <svg class="ic-svg lg"><use href="#i-trophy"/></svg>
-            <span data-i18n="tab.leaderboards">Leaderboards</span>
+
+          <!-- Secondary tiles -->
+          <button class="bento-tile" data-go="leaderboards" style="--bento-i:4">
+            <span class="bento-sheen"></span>
+            <svg class="ic-svg lg bento-tile-icon"><use href="#i-trophy"/></svg>
+            <span class="bento-tile-label" data-i18n="tab.leaderboards">Leaderboards</span>
           </button>
-          <button class="menu-tile glass" data-go="achievements">
-            <svg class="ic-svg lg"><use href="#i-medal"/></svg>
-            <span data-i18n="tab.achievements">Achievements</span>
+          <button class="bento-tile" data-go="tasks" style="--bento-i:5">
+            <span class="bento-sheen"></span>
+            <svg class="ic-svg lg bento-tile-icon"><use href="#i-tasks"/></svg>
+            <span class="bento-tile-label" data-i18n="tab.tasks">Tasks</span>
           </button>
-          <button class="menu-tile glass" data-go="settings">
-            <svg class="ic-svg lg"><use href="#i-settings"/></svg>
-            <span data-i18n="tab.settings">Settings</span>
+          <button class="bento-tile" data-go="profile" style="--bento-i:6">
+            <span class="bento-sheen"></span>
+            <svg class="ic-svg lg bento-tile-icon"><use href="#i-profile"/></svg>
+            <span class="bento-tile-label" data-i18n="tab.profile">Profile</span>
           </button>
-          <button class="menu-tile glass menu-tile-shop" id="menu-shop">
-            <svg class="ic-svg lg"><use href="#i-shop"/></svg>
-            <span data-i18n="tab.shop">Shop</span>
+          <button class="bento-tile" data-go="stats" style="--bento-i:7">
+            <span class="bento-sheen"></span>
+            <svg class="ic-svg lg bento-tile-icon"><use href="#i-stats"/></svg>
+            <span class="bento-tile-label" data-i18n="tab.stats">Stats</span>
           </button>
-          <button class="menu-tile glass menu-tile-tour" data-go="tournaments">
-            <svg class="ic-svg lg"><use href="#i-trophy"/></svg>
-            <span data-i18n="tab.tournaments">Tournaments</span>
+          <button class="bento-tile" data-go="achievements" style="--bento-i:8">
+            <span class="bento-sheen"></span>
+            <svg class="ic-svg lg bento-tile-icon"><use href="#i-medal"/></svg>
+            <span class="bento-tile-label" data-i18n="tab.achievements">Achievements</span>
           </button>
-          <button class="menu-tile glass menu-tile-admin hidden" id="menu-admin" data-go="admin">
-            <svg class="ic-svg lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-4z"/><path d="M9 12l2 2 4-4"/></svg>
-            <span data-i18n="menu.admin">Admin</span>
+          <button class="bento-tile" data-go="settings" style="--bento-i:9">
+            <span class="bento-sheen"></span>
+            <svg class="ic-svg lg bento-tile-icon"><use href="#i-settings"/></svg>
+            <span class="bento-tile-label" data-i18n="tab.settings">Settings</span>
           </button>
-          <button class="menu-tile glass menu-tile-exit" id="menu-exit">
-            <svg class="ic-svg lg"><use href="#i-door"/></svg>
-            <span data-i18n="menu.exit">Exit</span>
+
+          <!-- Admin tile is hidden by default (revealed via isAdminUser()
+               in ui.js). The .hidden class lets the grid skip the slot. -->
+          <button class="bento-tile bento-admin hidden" id="menu-admin" data-go="admin" style="--bento-i:10">
+            <span class="bento-sheen"></span>
+            <svg class="ic-svg lg bento-tile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-4z"/><path d="M9 12l2 2 4-4"/></svg>
+            <span class="bento-tile-label" data-i18n="menu.admin">Admin</span>
+          </button>
+
+          <button class="bento-tile bento-exit" id="menu-exit" style="--bento-i:11">
+            <span class="bento-sheen"></span>
+            <svg class="ic-svg lg bento-tile-icon"><use href="#i-door"/></svg>
+            <span class="bento-tile-label" data-i18n="menu.exit">Exit</span>
           </button>
         </div>
       </div>

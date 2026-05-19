@@ -44,113 +44,367 @@
   padding: 28px 24px;
 }
 
-/* Big "Play" card */
-.play-card {
+/* ============================================================
+   Bento layout
+   ============================================================
+   Asymmetric grid where the Play tile spans 2 columns × 2 rows
+   so it dominates the visual weight, the "What's new" tile takes
+   a full 2-col-wide accent strip, and the rest of the tiles flow
+   into the remaining slots. The layout collapses to 2 columns on
+   narrow screens with Play staying as a wide hero on top.
+
+   Entrance is staggered with --bento-i (set per tile in HTML) and
+   a single cubic-bezier so it feels handcrafted, not generic.
+   Hover effects use transform + opacity only so GPU does the work
+   and the menu stays at 60fps even on cheap Android.
+
+   Every variable lives in :root (base.css). We never reach into
+   the global background — only ambient blobs sit *behind* the grid
+   to add depth without competing with the body gradient.
+   ============================================================ */
+.bento-body {
   position: relative;
-  width: min(560px, 100%);
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 24px 20px 36px;
+  gap: 0;
+}
+
+/* Drifting ambient blobs behind the grid. Pure transform animation,
+   no opacity flicker, so it's effectively free on the GPU. */
+.menu-ambient {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.menu-ambient .amb {
+  position: absolute;
+  width: 360px; height: 360px;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: .55;
+  will-change: transform;
+}
+.menu-ambient .amb-1 {
+  top: -120px; left: -120px;
+  background: radial-gradient(closest-side, rgba(124, 92, 255, .55), transparent 70%);
+  animation: ambDrift1 26s ease-in-out infinite;
+}
+.menu-ambient .amb-2 {
+  top: 35%; right: -160px;
+  background: radial-gradient(closest-side, rgba(36, 189, 255, .45), transparent 70%);
+  animation: ambDrift2 32s ease-in-out infinite;
+}
+.menu-ambient .amb-3 {
+  bottom: -160px; left: 30%;
+  background: radial-gradient(closest-side, rgba(255, 92, 198, .30), transparent 70%);
+  animation: ambDrift3 38s ease-in-out infinite;
+}
+@keyframes ambDrift1 {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(60px, 40px); }
+}
+@keyframes ambDrift2 {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(-50px, 30px); }
+}
+@keyframes ambDrift3 {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(40px, -50px); }
+}
+
+/* The grid itself. 4 cols on desktop, 2 cols on mobile. Auto-rows
+   make every tile the same height so the bento reads as a quilt. */
+.bento-grid {
+  position: relative;
+  z-index: 1;
+  width: min(880px, 100%);
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 18px;
-  padding: 22px 26px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: 92px;
+  gap: 14px;
+}
+
+/* Generic tile */
+.bento-tile {
+  position: relative;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px;
+  padding: 14px 12px;
+  border-radius: 18px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-weight: 700; font-size: 13px;
+  letter-spacing: .01em;
+  cursor: pointer;
+  text-align: center;
+  isolation: isolate;
+  /* Stagger entrance via the inline --bento-i index. */
+  animation: bentoIn .55s cubic-bezier(.22, 1, .36, 1) backwards;
+  animation-delay: calc(var(--bento-i, 0) * 55ms + 60ms);
+  transition:
+    transform .18s cubic-bezier(.22, 1, .36, 1),
+    background .25s ease,
+    border-color .25s ease,
+    box-shadow .25s ease;
+  will-change: transform;
+}
+.bento-tile .bento-tile-icon {
+  color: var(--accent);
+  width: 26px; height: 26px;
+  transition: transform .25s cubic-bezier(.22, 1, .36, 1);
+}
+.bento-tile .bento-tile-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bento-tile:hover {
+  background: var(--card-strong);
+  border-color: var(--border-strong);
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .28);
+}
+.bento-tile:hover .bento-tile-icon { transform: scale(1.08) translateY(-1px); }
+.bento-tile:active { transform: translateY(-1px); }
+
+/* Soft diagonal sheen that sweeps across the tile on hover. We keep
+   it inside the tile and use only transform so it's GPU-cheap. */
+.bento-tile .bento-sheen {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg,
+    transparent 30%,
+    rgba(255, 255, 255, .10) 50%,
+    transparent 70%);
+  transform: translateX(-110%);
+  transition: transform .65s cubic-bezier(.22, 1, .36, 1);
+}
+.bento-tile:hover .bento-sheen { transform: translateX(110%); }
+
+@keyframes bentoIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ----- HERO Play tile (2 × 2) ---------------------------------- */
+.bento-play {
+  grid-column: span 2;
+  grid-row: span 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px;
   border-radius: 22px;
-  text-align: left;
   background: var(--accent-grad);
   border: 0;
   color: #fff;
   box-shadow:
-    0 18px 50px rgba(124, 92, 255, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.25s ease, filter 0.2s ease;
-  overflow: hidden;
+    0 18px 50px rgba(124, 92, 255, .45),
+    inset 0 1px 0 rgba(255, 255, 255, .22);
+  text-align: left;
 }
-.play-card::after {
+.bento-play::after {
   content: "";
   position: absolute; inset: 0;
   background:
-    radial-gradient(400px 200px at 0% 0%, rgba(255, 255, 255, 0.20), transparent 70%),
-    radial-gradient(400px 200px at 100% 100%, rgba(255, 255, 255, 0.12), transparent 70%);
+    radial-gradient(400px 200px at 0% 0%, rgba(255, 255, 255, .22), transparent 70%),
+    radial-gradient(400px 200px at 100% 100%, rgba(255, 255, 255, .12), transparent 70%);
   pointer-events: none;
 }
-.play-card:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.05);
+.bento-play:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.06);
   box-shadow:
-    0 22px 60px rgba(124, 92, 255, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    0 22px 64px rgba(124, 92, 255, .55),
+    inset 0 1px 0 rgba(255, 255, 255, .26);
 }
-.play-card:active { transform: translateY(0); }
-
-.play-card-icon {
+.bento-play .bento-glow {
+  position: absolute;
+  width: 240px; height: 240px;
+  left: 60%; top: 60%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, .28), transparent 70%);
+  filter: blur(40px);
+  pointer-events: none;
+  animation: heroGlow 7s ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes heroGlow {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-30px, -20px) scale(1.15); }
+}
+.bento-play-head {
+  display: flex; align-items: center; gap: 16px;
+  position: relative;
+}
+.bento-play-icon {
   width: 64px; height: 64px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.20);
+  background: rgba(255, 255, 255, .20);
   display: grid; place-items: center;
   color: #fff;
   flex: 0 0 auto;
-  position: relative;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25);
 }
-.play-card-icon .ic-svg { width: 30px; height: 30px; }
-
-.play-card-text { min-width: 0; position: relative; }
-.play-card-text .big {
-  font-weight: 800; font-size: 28px;
-  letter-spacing: 0.02em; line-height: 1.05;
+.bento-play-icon .ic-svg { width: 30px; height: 30px; }
+.bento-play-text { min-width: 0; }
+.bento-play-text .big {
+  font-weight: 800; font-size: 30px;
+  letter-spacing: .02em; line-height: 1.04;
 }
-.play-card-text .sub {
-  font-size: 13px; color: rgba(255, 255, 255, 0.86);
+.bento-play-text .sub {
+  font-size: 13px; color: rgba(255, 255, 255, .88);
   margin-top: 4px;
 }
-
-.play-card-stats {
-  display: flex; flex-direction: column; gap: 6px;
-  text-align: right;
+.bento-play-stats {
+  display: flex; gap: 22px;
   position: relative;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, .18);
+}
+.bento-play-stats > div {
+  display: flex; align-items: baseline; gap: 6px;
+  font-size: 12px; color: rgba(255, 255, 255, .85);
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.bento-play-stats b {
+  font-size: 18px; color: #fff;
+  letter-spacing: .04em;
+  text-transform: none;
+}
+
+/* ----- "What's new" wide accent tile (2 × 1) -------------------- */
+.bento-news {
+  grid-column: span 2;
+  flex-direction: row;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 14px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, rgba(255, 92, 198, .14), rgba(124, 92, 255, .12));
+  border-color: rgba(255, 92, 198, .35);
+}
+.bento-news:hover {
+  border-color: rgba(255, 92, 198, .65);
+  background: linear-gradient(135deg, rgba(255, 92, 198, .22), rgba(124, 92, 255, .18));
+}
+.bento-news-icon {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: grid; place-items: center;
+  background: rgba(255, 92, 198, .22);
+  color: #ffdaf0;
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px rgba(255, 92, 198, .35);
+}
+.bento-news-icon .ic-svg { width: 22px; height: 22px; }
+.bento-news-text {
+  display: flex; flex-direction: column;
+  min-width: 0; flex: 1;
+}
+.bento-news-text b {
+  font-size: 14px; letter-spacing: .02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bento-news-sub {
+  font-size: 11px; color: var(--fg-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.bento-news-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #ff5cc6;
+  box-shadow: 0 0 0 0 rgba(255, 92, 198, .65);
+  animation: newsPulse 1.8s ease-in-out infinite;
   flex: 0 0 auto;
 }
-.play-card-stats > div {
-  font-size: 12px; color: rgba(255, 255, 255, 0.85);
-  display: flex; align-items: baseline; gap: 6px;
-  justify-content: flex-end;
-}
-.play-card-stats b {
-  font-size: 16px; color: #fff;
-  letter-spacing: 0.04em;
+.bento-news-dot.hidden { display: none; }
+@keyframes newsPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 92, 198, .0); }
+  50%      { box-shadow: 0 0 0 8px rgba(255, 92, 198, .25); }
 }
 
-/* ---------- Secondary tiles ---------- */
-.menu-grid {
-  width: min(720px, 100%);
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+/* ----- Distinct accents per tile family ------------------------- */
+.bento-tile.bento-tour {
+  background: linear-gradient(135deg, rgba(61, 220, 151, .14), rgba(36, 189, 255, .10));
+  border-color: rgba(61, 220, 151, .35);
 }
-.menu-tile {
-  display: flex; align-items: center; justify-content: center;
-  gap: 10px;
-  padding: 16px 14px;
-  border-radius: 16px;
-  font-weight: 700; font-size: 14px;
-  color: var(--fg);
-  background: var(--card);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    background 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+.bento-tile.bento-tour:hover { border-color: rgba(61, 220, 151, .65); }
+.bento-tile.bento-tour .bento-tile-icon { color: #7cf1b8; }
+
+.bento-tile.bento-shop {
+  background: linear-gradient(135deg, rgba(255, 180, 84, .18), rgba(124, 92, 255, .10));
+  border-color: rgba(255, 180, 84, .38);
 }
-.menu-tile svg { color: var(--accent); flex: 0 0 auto; }
-.menu-tile:hover {
-  background: var(--card-strong);
-  border-color: var(--border-strong);
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.20);
+.bento-tile.bento-shop:hover { border-color: rgba(255, 180, 84, .68); }
+.bento-tile.bento-shop .bento-tile-icon { color: #ffd591; }
+
+.bento-tile.bento-admin {
+  background: linear-gradient(135deg, rgba(124, 92, 255, .16), rgba(36, 189, 255, .10));
+  border-color: rgba(124, 92, 255, .35);
 }
-.menu-tile:active { transform: translateY(0); }
+.bento-tile.bento-admin .bento-tile-icon { color: #a98bff; }
+
+.bento-tile.bento-exit {
+  background: linear-gradient(135deg, rgba(255, 100, 112, .12), rgba(255, 92, 198, .08));
+  border-color: rgba(255, 100, 112, .30);
+}
+.bento-tile.bento-exit:hover { border-color: rgba(255, 100, 112, .55); }
+.bento-tile.bento-exit .bento-tile-icon { color: #ffb4c1; }
+
+/* ----- Responsive collapse -------------------------------------- */
+@media (max-width: 720px) {
+  .bento-body { padding: 16px 12px 24px; }
+  .bento-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 80px;
+    gap: 10px;
+  }
+  .bento-play {
+    grid-column: span 2;
+    grid-row: span 2;
+    padding: 18px;
+  }
+  .bento-play-text .big { font-size: 24px; }
+  .bento-news { grid-column: span 2; }
+  .menu-ambient .amb { width: 280px; height: 280px; opacity: .45; }
+}
+@media (max-width: 380px) {
+  .bento-grid { gap: 8px; grid-auto-rows: 72px; }
+  .bento-tile { font-size: 12px; padding: 10px 8px; }
+  .bento-tile .bento-tile-icon { width: 22px; height: 22px; }
+  .bento-play-icon { width: 52px; height: 52px; border-radius: 14px; }
+  .bento-play-icon .ic-svg { width: 24px; height: 24px; }
+  .bento-play-text .big { font-size: 22px; }
+  .bento-play-stats { gap: 14px; }
+}
+
+/* Respect reduced-motion preference — disable entrance animation,
+   ambient drift, and sheen sweep entirely so the menu still works
+   on low-end / accessibility profiles. */
+@media (prefers-reduced-motion: reduce) {
+  .bento-tile { animation: none; }
+  .bento-tile .bento-sheen { display: none; }
+  .menu-ambient .amb { animation: none; }
+  .bento-play .bento-glow { animation: none; }
+  .bento-news-dot { animation: none; }
+}
 
 /* ---------- HEX coin pill + daily reward pill (menu header) ---------- */
 .menu-pills {

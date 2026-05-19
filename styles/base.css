@@ -155,3 +155,10 @@ input { font: inherit; color: inherit; }
   background: var(--accent-grad); border-radius: 99px;
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Generic display utility — used by JS toggles like the admin tile
+   (ui.js: admTile.classList.toggle("hidden", !isAdmin)) and the
+   what's-new pulse dot. Marked !important so element-specific
+   selectors with higher specificity (e.g. .bento-tile rules) never
+   accidentally override the hide. */
+.hidden { display: none !important; }
