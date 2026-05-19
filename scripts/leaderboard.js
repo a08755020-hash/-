@@ -114,6 +114,12 @@ function _lbParseRemote(data){
       name:  String(e.name || "").slice(0, 24),
       id:    String(e.id   || ""),
       score: Math.max(0, Math.floor(Number(e.score) || 0)),
+      /* `lvl` is the cached player level at the moment of the last
+         submit. Older entries don't have it — fall back to 1 so the
+         column never shows "—". The current player's row is always
+         recomputed locally from state.stats.xp, so a stale `lvl` from
+         the bin only affects other players' rows. */
+      lvl:   Math.max(1, Math.min(999, Math.floor(Number(e.lvl) || 1))),
       at:    Number(e.at)  || 0,
     }))
     .filter(e => e.id && e.score > 0);
@@ -124,16 +130,25 @@ function _lbParseRemote(data){
    round-trips. The remote copy of "me" wins if it has a higher
    score (e.g. the player set a record on another device). */
 function _lbMergeMe(remote){
-  const out = (remote || []).map(e => Object.assign({}, e, { me: e.id === state.profile.id }));
+  /* Always recompute the current player's level from local stats so a
+     stale `lvl` cached in the bin never beats the truth on this device.
+     Other players' rows keep whatever `lvl` they submitted. */
+  const myLvl = (typeof levelInfo === "function" && state.stats)
+                  ? levelInfo(state.stats.xp || 0).lvl
+                  : 1;
+  const out = (remote || []).map(e => Object.assign({}, e, {
+    me:  e.id === state.profile.id,
+    lvl: e.id === state.profile.id ? myLvl : (e.lvl | 0) || 1,
+  }));
   const myId    = state.profile.id;
   const myScore = state.stats.best || 0;
   const myName  = state.profile.nickname || "";
   if (myId && myScore > 0){
     const idx = out.findIndex(e => e.id === myId);
     if (idx < 0){
-      out.push({ name: myName || "—", id: myId, score: myScore, at: Date.now(), me: true });
+      out.push({ name: myName || "—", id: myId, score: myScore, lvl: myLvl, at: Date.now(), me: true });
     } else if (out[idx].score < myScore){
-      out[idx] = { name: myName || out[idx].name, id: myId, score: myScore, at: Date.now(), me: true };
+      out[idx] = { name: myName || out[idx].name, id: myId, score: myScore, lvl: myLvl, at: Date.now(), me: true };
     }
   }
   out.sort((a, b) => (b.score | 0) - (a.score | 0));
@@ -196,10 +211,18 @@ async function submitLeaderboardScore(){
     const data    = await _lbFetchJSON(getSharedBlobUrl(), { method: "GET" });
     const entries = _lbParseRemote(data);
     const idx     = entries.findIndex(e => e.id === myId);
-    const mine    = { name: myName.slice(0, 24), id: myId, score: myBest, at: Date.now() };
-    if (idx < 0)                            entries.push(mine);
-    else if (entries[idx].score < myBest)    entries[idx] = mine;
-    else                                    return; // nothing new to write
+    const myLvl   = (typeof levelInfo === "function")
+                      ? levelInfo((state.stats && state.stats.xp) || 0).lvl
+                      : 1;
+    const mine    = { name: myName.slice(0, 24), id: myId, score: myBest, lvl: myLvl, at: Date.now() };
+    /* Refresh the row whenever either the score or the cached level
+       changed — that way bumping the level via the admin "Set my
+       level" action propagates to the bin even when the score didn't
+       move. */
+    if (idx < 0)                                        entries.push(mine);
+    else if (entries[idx].score < myBest)                entries[idx] = mine;
+    else if ((entries[idx].lvl | 0) !== (myLvl | 0))    entries[idx] = Object.assign({}, entries[idx], { lvl: myLvl, at: Date.now() });
+    else                                                return; // nothing new to write
     entries.sort((a, b) => (b.score | 0) - (a.score | 0));
     /* Echo back unknown top-level fields so the activations module's
        state (codeUsage, grants) survives our PUT. */
@@ -246,6 +269,7 @@ function _lbPaint(){
     { k: "lb.rank",  cls: "" },
     { k: "lb.name",  cls: "" },
     { k: "lb.id",    cls: "col-id" },
+    { k: "lb.level", cls: "col-lvl" },
     { k: "lb.score", cls: "" },
   ];
   headers.forEach(h => {
@@ -281,12 +305,20 @@ function _lbPaint(){
     id.style.fontSize   = "12px";
     id.style.color      = "var(--fg-dim)";
     id.textContent = row.id || "—";
+    /* Level pill — small accent chip so the column stays visible on
+       narrow screens. The `Lvl` prefix comes from the existing
+       hud.lvl translation. */
+    const lv = document.createElement("div");
+    lv.className   = "col-lvl lvl" + (me ? " me" : "");
+    const lvLbl = (typeof t === "function" ? t("hud.lvl") : null) || "Lvl";
+    lv.innerHTML = '<span class="lvl-lbl">' + lvLbl + '</span> <b>' + ((row.lvl | 0) || 1) + '</b>';
     const sc = document.createElement("div");
     sc.className   = "sc" + (me ? " me" : "");
     sc.textContent = (row.score || 0).toLocaleString();
     tbl.appendChild(rk);
     tbl.appendChild(nm);
     tbl.appendChild(id);
+    tbl.appendChild(lv);
     tbl.appendChild(sc);
   });
 }

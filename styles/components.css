@@ -197,7 +197,8 @@
 /* ---------- Leaderboard ---------- */
 .lb-table {
   display: grid;
-  grid-template-columns: 70px 1fr 130px 130px;
+  /* rank | name | id | level | score */
+  grid-template-columns: 70px 1fr 130px 88px 130px;
   gap: 0; border-radius: 16px; overflow: hidden;
   border: 1px solid var(--border);
 }
@@ -217,9 +218,26 @@
 }
 .lb-table .rk { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
 .lb-table .sc { font-family: 'JetBrains Mono', monospace; text-align: right; font-weight: 700; }
+.lb-table .col-lvl { text-align: center; }
+.lb-table .col-lvl .lvl-lbl {
+  color: var(--fg-mute); font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase; margin-right: 4px;
+}
+.lb-table .col-lvl b {
+  font-family: 'JetBrains Mono', monospace; font-weight: 800;
+  color: var(--fg);
+}
+.lb-table .col-lvl.me b {
+  background: var(--accent-grad);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
 @media (max-width: 640px) {
-  .lb-table { grid-template-columns: 52px 1fr 100px; }
+  /* On narrow screens drop the ID column but keep level so the
+     player still sees everyone's rank, name, level, and score. */
+  .lb-table { grid-template-columns: 52px 1fr 64px 96px; }
   .lb-table .col-id { display: none; }
+  .lb-table .col-lvl { padding: 12px 6px; }
+  .lb-table .col-lvl .lvl-lbl { display: none; }
 }
 
 /* ---------- Tasks ---------- */

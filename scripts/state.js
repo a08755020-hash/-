@@ -74,6 +74,15 @@ function levelInfo(totalXp){
     if(lvl > 999) return { lvl, into: 0, need: 80 + (lvl-1)*40 };
   }
 }
+/* Inverse of levelInfo — the exact total-XP that lands the player at
+   the start of level `n` with 0 progress into it. Used by the admin
+   "Set my level" action so the menu, HUD and leaderboard all show the
+   chosen level immediately and consistently. Derived analytically:
+   sum_{i=1}^{n-1} (80 + (i-1)*40) = 80*(n-1) + 20*(n-1)*(n-2). */
+function xpForLevel(n){
+  const lvl = Math.max(1, Math.min(999, (n|0) || 1));
+  return 80 * (lvl - 1) + 20 * (lvl - 1) * (lvl - 2);
+}
 function addXP(n){
   const before = levelInfo(state.stats.xp).lvl;
   state.stats.xp = (state.stats.xp||0) + n;

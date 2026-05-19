@@ -550,6 +550,22 @@ function renderAdminScreen(){
         '<button class="btn btn-ghost"   id="admin-copy-id"   data-i18n="admin.act.copy">Copy ID</button>'+
         '<button class="btn btn-ghost admin-reset" id="admin-reset-counters" data-i18n="admin.act.reset">Reset counters</button>'+
       '</div>'+
+      /* Admin: set own level. Writes the exact XP needed to land at
+         the requested level (with 0 progress into it) and refreshes
+         every place the level is shown (menu hero, HUD, profile,
+         leaderboard) so the change is visible immediately. */
+      '<div class="admin-gen admin-setlvl">'+
+        '<div class="admin-gen-head"><b data-i18n="admin.setlvl.title">Set my level</b></div>'+
+        '<div class="admin-gen-hint" data-i18n="admin.setlvl.hint">Pick any level from 1 to 999. The change is local and is also pushed to the shared leaderboard so other players see your new level.</div>'+
+        '<div class="admin-gen-field">'+
+          '<label data-i18n="admin.setlvl.label">Level</label>'+
+          '<div class="admin-gen-row">'+
+            '<input type="number" id="admin-setlvl-input" min="1" max="999" value="' + ((typeof levelInfo === "function") ? levelInfo(state.stats.xp || 0).lvl : 1) + '">'+
+            '<button class="btn btn-primary" id="admin-setlvl-btn" data-i18n="admin.setlvl.btn">Apply</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="admin-gen-out mono" id="admin-setlvl-out" data-i18n="admin.setlvl.idle">—</div>'+
+      '</div>'+
       /* New: direct HEX grant by HEXON ID. Pushes a record into the
          shared bin; the target player picks it up on their next poll. */
       '<div class="admin-gen admin-grant">'+
@@ -635,6 +651,49 @@ function renderAdminScreen(){
     if (typeof renderShop === "function") renderShop();
     toast(t("admin.act.reset.ok") || "Counters reset", "success");
   });
+
+  /* Admin: set my level. Reads the input, clamps to 1..999, writes
+     the analytically-correct total XP via xpForLevel(), saves state,
+     and refreshes every place the level is shown. */
+  const setLvlInput = document.getElementById("admin-setlvl-input");
+  const setLvlBtn   = document.getElementById("admin-setlvl-btn");
+  const setLvlOut   = document.getElementById("admin-setlvl-out");
+  if (setLvlBtn && setLvlInput){
+    setLvlBtn.addEventListener("click", () => {
+      const raw = parseInt(setLvlInput.value, 10);
+      const target = Math.max(1, Math.min(999, isFinite(raw) ? raw : 1));
+      setLvlInput.value = String(target);
+      if (typeof xpForLevel === "function"){
+        state.stats.xp = xpForLevel(target);
+        saveState();
+        if (setLvlOut){
+          const tmpl = (typeof t === "function" ? t("admin.setlvl.ok") : null)
+                       || "Level set to {n}";
+          setLvlOut.textContent = tmpl.replace("{n}", target);
+        }
+        if (typeof updateHUD     === "function") updateHUD();
+        if (typeof renderMenu    === "function") renderMenu();
+        if (typeof renderProfile === "function") renderProfile();
+        /* Push the new level to the shared bin so other players see
+           it on the leaderboard. Fire-and-forget. */
+        if (typeof submitLeaderboardScore === "function") submitLeaderboardScore();
+        /* Re-merge local state so the leaderboard table reflects the
+           change immediately (other players have to wait for their
+           next poll). */
+        if (typeof ensureLeaderboards === "function") ensureLeaderboards();
+        if (typeof renderLeaderboards === "function" && typeof currentScreen !== "undefined" && currentScreen === "leaderboards"){
+          renderLeaderboards();
+        }
+        const okTmpl = (typeof t === "function" ? t("admin.toast.setlvl") : null)
+                       || "ADMIN: level set to {n}";
+        toast(okTmpl.replace("{n}", target), "success");
+      }
+    });
+    /* Enter inside the input also applies. */
+    setLvlInput.addEventListener("keydown", e => {
+      if (e.key === "Enter"){ e.preventDefault(); setLvlBtn.click(); }
+    });
+  }
 
   const genAmtInput = document.getElementById("admin-gen-amt");
   const genUsesInput = document.getElementById("admin-gen-uses");
